@@ -1,8 +1,20 @@
-# Secrets. These live on Leon's machine and in GitHub repo secrets, never in git.
-client_secret.json
-.yt-refresh-token
+# Secrets. Matched by PATTERN, never by exact filename.
+#
+# An exact-name list is how .gmail-refresh-leon got swept into a commit: the
+# list was written before the Gmail mint existed, so the new file simply was
+# not covered. GitHub push protection caught it. Patterns cover files that do
+# not exist yet.
+*refresh*token*
+.gmail-refresh*
+.yt-refresh*
+*client_secret*.json
+*.token
 .cf-token
 .bot-token
+.eventsub-secret
+.vod-webhook-token
+*.pem
+*.key
 
 # Working files
 _tmp_*.mp4

@@ -18,6 +18,7 @@ jobs:
     timeout-minutes: 350
     permissions:
       contents: write
+      actions: write   # so a run can re-trigger itself while a backlog remains
 
     steps:
       - uses: actions/checkout@v4
@@ -42,6 +43,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Archive
+        id: archive
         env:
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
           TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
@@ -68,3 +70,14 @@ jobs:
           else
             echo "manifest unchanged"
           fi
+
+      - name: Continue if a backlog remains
+        # Only re-triggers when this run actually archived something, so a
+        # persistent failure stops the chain rather than looping forever.
+        # This makes the backlog drain without depending on the cron firing.
+        if: steps.archive.outputs.continue == 'yes'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Archived ${{ steps.archive.outputs.archived }} this run, ${{ steps.archive.outputs.remaining }} still to go - starting another."
+          gh workflow run vod-to-youtube.yml --repo "$GITHUB_REPOSITORY"

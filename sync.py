@@ -245,7 +245,21 @@ def main():
             if os.path.exists(path):
                 os.remove(path)
 
-    log("\ndone")
+    # Tell the workflow whether to run itself again. Continuing only when
+    # progress was actually made means a persistent failure stops the loop
+    # instead of re-triggering forever.
+    archived_this_run = len(done) - len(done_ids)
+    remaining = len(pending) - archived_this_run
+    log(f"\narchived {archived_this_run} this run, {remaining} still outstanding")
+
+    step_out = os.environ.get("GITHUB_OUTPUT")
+    if step_out:
+        with open(step_out, "a", encoding="utf-8") as fh:
+            fh.write(f"archived={archived_this_run}\n")
+            fh.write(f"remaining={remaining}\n")
+            fh.write(f"continue={'yes' if remaining > 0 and archived_this_run > 0 else 'no'}\n")
+
+    log("done")
 
 
 if __name__ == "__main__":
