@@ -1,0 +1,10 @@
+# Secrets. These live on Leon's machine and in GitHub repo secrets, never in git.
+client_secret.json
+.yt-refresh-token
+.cf-token
+.bot-token
+
+# Working files
+_tmp_*.mp4
+__pycache__/
+*.pyc

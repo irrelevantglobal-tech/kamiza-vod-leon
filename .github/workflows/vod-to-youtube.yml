@@ -1,0 +1,70 @@
+name: Archive Twitch VODs to YouTube
+
+on:
+  schedule:
+    # Every 3 hours. Also keeps the repo "active" so GitHub does not disable
+    # scheduled workflows on public repos after 60 days of quiet.
+    - cron: "17 */3 * * *"
+  workflow_dispatch:
+
+# The manifest is committed back after each run, so runs must not overlap.
+concurrency:
+  group: vod-archive
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free up runner disk
+        # A default runner has ~14 GB free; VODs are routinely bigger than that.
+        # Dropping the preinstalled toolchains gets it to roughly 40 GB.
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          sudo apt-get clean || true
+          df -h /
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Archive
+        env:
+          TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+          TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+          TWITCH_CHANNEL: ${{ secrets.TWITCH_CHANNEL }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          KAMIZA_WORKER_URL: ${{ secrets.KAMIZA_WORKER_URL }}
+          KAMIZA_WEBHOOK_TOKEN: ${{ secrets.KAMIZA_WEBHOOK_TOKEN }}
+          KAMIZA_WHO: ${{ vars.KAMIZA_WHO }}
+        run: python sync.py
+
+      - name: Commit manifest
+        # Runs even if the archive step died partway, so completed uploads are
+        # never re-downloaded on the next run.
+        if: always()
+        run: |
+          git config user.name "kamiza-archive"
+          git config user.email "kamiza-archive@users.noreply.github.com"
+          if ! git diff --quiet uploaded.json; then
+            git add uploaded.json
+            git commit -m "archive: $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          else
+            echo "manifest unchanged"
+          fi
