@@ -71,6 +71,34 @@ jobs:
             echo "manifest unchanged"
           fi
 
+      - name: Report Actions minutes used this month
+        # Private repos get 2,000 free minutes a month. Running out stops the
+        # archive with no error anywhere, so each lane tallies its own usage and
+        # the Kamiza worker shouts in #archive-health when the pair hits 90%.
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKER: ${{ secrets.KAMIZA_WORKER_URL }}
+          WEBHOOK_TOKEN: ${{ secrets.KAMIZA_WEBHOOK_TOKEN }}
+        run: |
+          set -e
+          SINCE="$(date -u +%Y-%m-01T00:00:00Z)"
+          # Sum billable Linux ms across this month's runs for this repo.
+          MS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?created=>=$SINCE&per_page=100" \
+                 --jq '[.workflow_runs[].id] | .[]' \
+               | while read -r id; do
+                   gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/timing" --jq '.billable.UBUNTU.total_ms // 0' 2>/dev/null || echo 0
+                 done | awk '{s+=$1} END {print s+0}')
+          MINUTES=$(awk -v ms="$MS" 'BEGIN {printf "%.0f", ms/60000}')
+          echo "This repo has used ~${MINUTES} Actions minutes since ${SINCE}"
+          if [ -n "$WORKER" ] && [ -n "$WEBHOOK_TOKEN" ]; then
+            curl -sS -X POST "$WORKER/usage" \
+              -H "Authorization: Bearer $WEBHOOK_TOKEN" \
+              -H 'Content-Type: application/json' \
+              -d "{\"repo\":\"$GITHUB_REPOSITORY\",\"minutes\":$MINUTES}" || true
+            echo ""
+          fi
+
       - name: Continue if a backlog remains
         # Only re-triggers when this run actually archived something, so a
         # persistent failure stops the chain rather than looping forever.
