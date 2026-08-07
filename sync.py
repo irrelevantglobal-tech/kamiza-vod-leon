@@ -126,6 +126,59 @@ def youtube():
     return build("youtube", "v3", credentials=creds, cache_discovery=False)
 
 
+PLAYLIST_TITLE = "VoD Archive"
+
+
+def get_or_create_playlist(yt):
+    """Find the archive playlist, or make it. Returns its id, or None if the
+    token predates the playlist scope - in which case uploads still work and
+    only the playlist step is skipped."""
+    try:
+        req = yt.playlists().list(part="snippet", mine=True, maxResults=50)
+        while req is not None:
+            res = req.execute()
+            for p in res.get("items", []):
+                if p["snippet"]["title"].strip().lower() == PLAYLIST_TITLE.lower():
+                    log(f"using existing playlist '{PLAYLIST_TITLE}' ({p['id']})")
+                    return p["id"]
+            req = yt.playlists().list_next(req, res)
+
+        created = yt.playlists().insert(
+            part="snippet,status",
+            body={
+                "snippet": {
+                    "title": PLAYLIST_TITLE,
+                    "description": "Twitch VODs archived automatically before Twitch deletes them.",
+                },
+                # Private, to match the videos. A public playlist of private
+                # videos would show as a wall of unavailable entries anyway.
+                "status": {"privacyStatus": "private"},
+            },
+        ).execute()
+        log(f"created playlist '{PLAYLIST_TITLE}' ({created['id']})")
+        return created["id"]
+    except Exception as exc:  # noqa: BLE001
+        log(f"playlist unavailable ({exc}) - uploads will still work, just not grouped")
+        return None
+
+
+def add_to_playlist(yt, playlist_id, video_id):
+    if not playlist_id:
+        return False
+    try:
+        yt.playlistItems().insert(
+            part="snippet",
+            body={"snippet": {
+                "playlistId": playlist_id,
+                "resourceId": {"kind": "youtube#video", "videoId": video_id},
+            }},
+        ).execute()
+        return True
+    except Exception as exc:  # noqa: BLE001 - a playlist failure must not fail the archive
+        log(f"  could not add to playlist: {exc}")
+        return False
+
+
 def download(vod, path):
     cmd = ["yt-dlp", "-f", "best", "--no-progress", "--no-warnings",
            "-o", path, vod["url"]]
@@ -216,6 +269,7 @@ def main():
         return
 
     yt = youtube()
+    playlist_id = get_or_create_playlist(yt)
     used = 0
 
     for v in pending:
@@ -235,6 +289,9 @@ def main():
             log(f"  downloaded {size/1e9:.1f} GB, uploading")
             vid = upload(yt, v, path)
             log(f"  uploaded as {vid} (private)")
+
+            if add_to_playlist(yt, playlist_id, vid):
+                log(f"  added to '{PLAYLIST_TITLE}'")
 
             done.append({"twitch_id": v["id"], "youtube_id": vid,
                          "title": v["title"], "archived": datetime.now(timezone.utc).isoformat()})

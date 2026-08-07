@@ -29,13 +29,16 @@ try:
 except ImportError:
     sys.exit("missing dependency. run:  py -m pip install google-auth-oauthlib")
 
-# upload = what the archive needs.
-# readonly = so we can PROVE which channel the token controls, and so the stats
-# lane can read subs/views later. Without readonly, channels.list returns 403 and
-# the only way to find out where VODs land is to upload one and look.
+# upload   = put the VOD on the channel.
+# readonly = PROVE which channel the token controls, and read subs/views for stats.
+#            Without it, channels.list 403s and the only way to find out where
+#            VODs land is to upload one and look.
+# youtube  = create and add to the "VoD Archive" playlist. upload alone cannot
+#            touch playlists at all - playlists.insert returns 403 with it.
 SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.readonly",
+    "https://www.googleapis.com/auth/youtube",
 ]
 HERE = os.path.dirname(os.path.abspath(__file__))
 SECRET = os.path.join(HERE, "client_secret.json")
