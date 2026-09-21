@@ -22,6 +22,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The branch HEAD at the moment this step runs, NOT the commit that existed when
+          # the run was queued. Runs now last hours, longer than the 3h cron, so a run can
+          # sit queued behind an earlier one; checking out its stale creation-time commit
+          # would hand it an OLD manifest and make it re-upload everything the earlier run
+          # just archived.
+          ref: main
 
       - name: Free up runner disk
         # A default runner has ~14 GB free; VODs are routinely bigger than that.
@@ -41,6 +48,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Install ffmpeg
+        # NOT preinstalled on GitHub's ubuntu runners (the 2026-09 run logs never mention
+        # it). Without it, time-sliced downloads - the only way to fit a 10h+ VOD on a
+        # ~36 GB runner - cannot run, and yt-dlp merely WARNS (hidden by --no-warnings)
+        # that it skipped its container fix-up. ffprobe (same package) is used to reject
+        # truncated or empty downloads before they are uploaded.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
 
       - name: Archive
         id: archive
@@ -66,6 +85,10 @@ jobs:
           if ! git diff --quiet uploaded.json; then
             git add uploaded.json
             git commit -m "archive: $(date -u +%Y-%m-%dT%H:%MZ)"
+            # sync.py already checkpoints after every upload; this is the fallback.
+            # Rebase first: a push from anyone else during a multi-hour run would
+            # otherwise be rejected, and that run's uploads forgotten and repeated.
+            git pull --rebase -q origin main
             git push
           else
             echo "manifest unchanged"
@@ -87,7 +110,7 @@ jobs:
           MS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?created=>=$SINCE&per_page=100" \
                  --jq '[.workflow_runs[].id] | .[]' \
                | while read -r id; do
-                   gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/timing" --jq '.billable.UBUNTU.total_ms // 0' 2>/dev/null || echo 0
+                   gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/timing" --jq '.run_duration_ms // 0' 2>/dev/null || echo 0
                  done | awk '{s+=$1} END {print s+0}')
           MINUTES=$(awk -v ms="$MS" 'BEGIN {printf "%.0f", ms/60000}')
           echo "This repo has used ~${MINUTES} Actions minutes since ${SINCE}"
