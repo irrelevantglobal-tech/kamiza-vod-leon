@@ -1,6 +1,6 @@
 # Secrets. Matched by PATTERN, never by exact filename.
 #
-# An exact-name list is how .gmail-refresh-leon got swept into a commit: the
+# An exact-name list is how one .gmail-refresh-<name> file got swept into a commit: the
 # list was written before the Gmail mint existed, so the new file simply was
 # not covered. GitHub push protection caught it. Patterns cover files that do
 # not exist yet.

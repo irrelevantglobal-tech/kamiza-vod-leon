@@ -6,8 +6,8 @@ lines into Discord. It can read; it can never send, delete or modify anything.
 Run from this folder:
     py mint_gmail.py <label>
 
-<label> is just a filename tag, e.g.  py mint_gmail.py leon
-                                      py mint_gmail.py glatiar
+<label> is just a filename tag, e.g.  py mint_gmail.py me
+                                      py mint_gmail.py cohost
 
 The browser opens. SIGN IN AS THE MAILBOX YOU WANT WATCHED - not whichever
 Google account happens to be logged in already. That is the mistake to avoid:
@@ -34,7 +34,7 @@ SECRET = os.path.join(HERE, "client_secret.json")
 def main():
     label = (sys.argv[1] if len(sys.argv) > 1 else "").strip().lower()
     if not label:
-        sys.exit("usage: py mint_gmail.py <label>   e.g.  py mint_gmail.py leon")
+        sys.exit("usage: py mint_gmail.py <label>   e.g.  py mint_gmail.py me")
 
     if not os.path.exists(SECRET):
         sys.exit(f"client_secret.json not found in {HERE}")

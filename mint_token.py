@@ -12,7 +12,7 @@ Run from this folder:
     py mint_token.py
 
 A browser window opens. Pick the Google account that owns the channel you want
-the VODs on. If the channel is a BRAND ACCOUNT (TwinkiesGhost is), you will get
+the VODs on. If the channel is a BRAND ACCOUNT (many streaming channels are), you will get
 a second chooser listing the brand channels - pick the brand channel there, not
 the personal account. Getting that wrong sends every VOD to the wrong channel
 and you will not notice for weeks.

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Kamiza VOD archive. Runs on GitHub Actions, not on anyone's machine.
+Twitch VOD archive. Runs on GitHub Actions, not on anyone's machine.
 
 Every few hours: list this channel's Twitch VODs, skip anything already
 archived or still being written, download it, upload it to YouTube as private,
-record it in the manifest, and post a card to the Kamiza Discord.
+record it in the manifest, and post a card to a private Discord.
 
 Notes that matter:
 
@@ -57,9 +57,9 @@ TWITCH_CHANNEL = os.environ["TWITCH_CHANNEL"]
 YT_ID = os.environ["YT_CLIENT_ID"]
 YT_SECRET = os.environ["YT_CLIENT_SECRET"]
 YT_REFRESH = os.environ["YT_REFRESH_TOKEN"]
-WHO = os.environ.get("KAMIZA_WHO", TWITCH_CHANNEL)
-WORKER = os.environ.get("KAMIZA_WORKER_URL", "").rstrip("/")
-WORKER_TOKEN = os.environ.get("KAMIZA_WEBHOOK_TOKEN", "")
+WHO = os.environ.get("ARCHIVE_LANE", TWITCH_CHANNEL)
+WORKER = os.environ.get("NOTIFY_WORKER_URL", "").rstrip("/")
+WORKER_TOKEN = os.environ.get("NOTIFY_WEBHOOK_TOKEN", "")
 
 # Stay inside the runner's disk and the 6h job limit.
 # Bytes are no longer a disk guard (each file is deleted after upload); the real
@@ -137,8 +137,8 @@ def checkpoint_manifest():
         return subprocess.run(["git", *a], cwd=HERE, capture_output=True, text=True, timeout=120)
 
     try:
-        git("config", "user.name", "kamiza-archive")
-        git("config", "user.email", "kamiza-archive@users.noreply.github.com")
+        git("config", "user.name", "vod-archiver-bot")
+        git("config", "user.email", "vod-archiver-bot@users.noreply.github.com")
         git("add", "uploaded.json")
         if git("diff", "--cached", "--quiet").returncode == 0:
             return
